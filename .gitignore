@@ -130,3 +130,6 @@ dmypy.json
 
 # ignore ide files
 .idea
+
+# ignore data
+data/**/*.tsv
