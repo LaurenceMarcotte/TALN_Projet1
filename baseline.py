@@ -1,7 +1,7 @@
 import sys
 import argparse
 import pandas as pd
-from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.linear_model import SGDClassifier
 from sklearn.model_selection import GridSearchCV, ParameterGrid
 from sklearn.metrics import classification_report
 from sklearn.pipeline import Pipeline
@@ -30,13 +30,15 @@ def read_data(file_name: str, dataset_name: str) -> pd.DataFrame:
     # standardization des données, i.e. création des colonnes 'sentence' et 'label' contenant les phrases exemples et
     # les classes associées
     if dataset_name == 'cola':
-        # TODO: Renommer les colonnes du dataframe contenant les phrases et les classes en "sentence" et "label" pour cola
+        # TODO: Renommer les colonnes du dataframe contenant les phrases et les classes en "sentence" et "label" pour
+        #  cola
         pass
     elif dataset_name == 'qqp':
         data['sentence'] = data.apply(lambda row: row['question1'] + ' ' + row['question2'], axis=1)
         data = data.rename(columns={'is_duplicate': 'label'})
     elif dataset_name == 'sst':
-        # TODO: Renommer les colonnes du dataframe contenant les phrases et les classes en "sentence" et "label" pour sst
+        # TODO: Renommer les colonnes du dataframe contenant les phrases et les classes en "sentence" et "label" pour
+        #  sst
         pass
 
     return data
@@ -44,6 +46,9 @@ def read_data(file_name: str, dataset_name: str) -> pd.DataFrame:
 
 def train_model(X_train, y_train):
     print("Pipeline created")
+    # on utilise un SGDClassifier qui implémente différents classificateurs utilisant la descente par gradient pour
+    # trouver la solution optimale. En précisant loss='log' lors de la création du classificateur, on lui dit
+    # explicitement d'utiliser une régression logistique
     pipeline = Pipeline(
         [
             ("vect", CountVectorizer()),
