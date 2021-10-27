@@ -22,7 +22,8 @@ def read_data(file_name, dataset_name):
     if dataset_name == 'cola':
         pass
     elif dataset_name == 'qqp':
-        pass
+        data['sentence'] = data.apply(lambda row: row['question1'] + ' ' + row['question2'], axis=1)
+        data = data.rename({'is_duplicate': 'label'})
     elif dataset_name == 'sst':
         pass
 
