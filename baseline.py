@@ -25,14 +25,15 @@ def read_data(file_name: str, dataset_name: str) -> pd.DataFrame:
     les labels associés aux exemples
     """
     # lecture fichier sous forme tsv
-    data = pd.read_csv(file_name, sep='\t')
+    if dataset_name == "cola":
+        data = pd.read_csv(file_name, sep="\t", header=None)
+    else:
+        data = pd.read_csv(file_name, sep='\t')
 
     # standardization des données, i.e. création des colonnes 'sentence' et 'label' contenant les phrases exemples et
     # les classes associées
     if dataset_name == 'cola':
-        # TODO: Renommer les colonnes du dataframe contenant les phrases et les classes en "sentence" et "label" pour
-        #  cola
-        pass
+        data.columns = ["id", "label", "label2", "sentence"]
     elif dataset_name == 'qqp':
         data['sentence'] = data.apply(lambda row: row['question1'] + ' ' + row['question2'], axis=1)
         data = data.rename(columns={'is_duplicate': 'label'})
