@@ -64,12 +64,21 @@ def train_model(X_train, y_train):
     # création d'une liste contenant un "produit cartésien" des hyperparamètres
     params = list(ParameterGrid(parameters))
 
-    print("Training...")
+    print("Training... on {} data".format(len(X_train)))
 
     # exploration des hyperparamètres
     gs_clf = GridSearchCV(pipeline, param_grid=params, cv=5, n_jobs=-1, refit=True, scoring='accuracy')
     model = gs_clf.fit(X_train, y_train)
     print("Training done")
+
+    print("Best parameters:")
+    print(model.best_params_)
+
+    print("Performance on train set")
+    y_pred = model.predict(X_train)
+
+    acc = classification_report(y_train, y_pred)
+    print(acc)
 
     return model
 
