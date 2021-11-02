@@ -56,7 +56,7 @@ def read_corpus(data):
 
 def convert_to_matrix(corpus, data):
     model = gensim.models.doc2vec.Doc2Vec(
-        vector_size=10, min_count=2, epochs=40)
+        vector_size=30, min_count=2, epochs=40)
     model.build_vocab(corpus)
     model.train(corpus, total_examples=model.corpus_count,
                 epochs=model.epochs)
@@ -95,7 +95,8 @@ if __name__ == "__main__":
     print("Training model...")
 
     # fit le model aux données de train
-    mlp = MLPClassifier(max_iter=1000)
+    mlp = MLPClassifier(
+        max_iter=2000, hidden_layer_sizes=(100, 5), verbose=True)
     mlp.fit(X_train, y_train.data)
 
     predict_train = mlp.predict(X_train)
