@@ -57,8 +57,12 @@ class Text_dataset(Dataset):
         return list(self.data['tokens'].values)
 
     def pad_sentence(self, s):
-        for _ in range(self.max_length-len(s)):
-            s.append('<pad>')
+        if len(s) <= self.max_length:
+            for _ in range(self.max_length-len(s)):
+                s.append('<pad>')
+        else:
+            diff = len(s) - self.max_length
+            s = s[diff:]
         return s
 
     def preprocess(self, lower=True, remove_punc=True, remove_numeric=True):
@@ -75,13 +79,11 @@ class Text_dataset(Dataset):
             filters.append(parsing.strip_numeric)
 
         self.data['tokens'] = self.data['sentence'].apply(lambda s: parsing.preprocess_string(s, filters))
-        self.data['tokens'] = self.data['tokens'].apply(lambda s: self.pad_sentence(s)
-                                                        if len(s) < self.max_length else s)
+        self.data['tokens'] = self.data['tokens'].apply(lambda s: self.pad_sentence(s))
 
         if self.dataset_name == 'qqp':
             self.data['tokens2'] = self.data['sentence2'].apply(lambda s: parsing.preprocess_string(s, filters))
-            self.data['tokens2'] = self.data['tokens2'].apply(lambda s: self.pad_sentence(s)
-                                                              if len(s) < self.max_length else s)
+            self.data['tokens2'] = self.data['tokens2'].apply(lambda s: self.pad_sentence(s))
 
 
 def make_parser():
