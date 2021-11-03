@@ -133,3 +133,8 @@ dmypy.json
 
 # ignore data
 data/**/*.tsv
+
+.vector_cache
+
+# ignore pickle
+*.p
