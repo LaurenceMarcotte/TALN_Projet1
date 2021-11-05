@@ -4,10 +4,15 @@ import argparse
 import pandas as pd
 import numpy as np
 from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import RepeatedStratifiedKFold
+from sklearn.model_selection import RandomizedSearchCV
 
 import gensim
 
 from sklearn.metrics import classification_report, confusion_matrix
+
+from collections import Counter
+from itertools import product
 
 # code inspiré de https://www.pluralsight.com/guides/machine-learning-neural-networks-scikit-learn
 
@@ -54,9 +59,9 @@ def read_corpus(data):
         yield gensim.models.doc2vec.TaggedDocument(tokens, [i])
 
 
-def convert_to_matrix(corpus, data):
+def convert_to_matrix(corpus, data, vector_size=30):
     model = gensim.models.doc2vec.Doc2Vec(
-        vector_size=30, min_count=2, epochs=40)
+        vector_size=vector_size, min_count=2, epochs=40)
     model.build_vocab(corpus)
     model.train(corpus, total_examples=model.corpus_count,
                 epochs=model.epochs)
@@ -65,6 +70,29 @@ def convert_to_matrix(corpus, data):
     stv = np.array(sentence2vec)
 
     return stv
+
+
+def train_model(model, X_train, y_train, max_nodes=100, nodes_step=5):
+    # exploration des hyperparamètres
+    # code inspiré de https://machinelearningmastery.com/hyperparameter-optimization-with-random-search-and-grid-search/
+    # define evaluation
+    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    # define search space
+    space = dict()
+    space["hidden_layer_sizes"] = [(100,), (100,50,), (100,50,100), (50,100,), (25, 50, 100)]
+    space["activation"] = ["identity", "logistic", "tanh", "relu"]
+    space["solver"] = ["lbfgs", "sgd", "adam"]
+    space["alpha"] = np.array([1, 0.1, 0.01, 0.001, 0.0001, 0])
+    # define search
+    search = RandomizedSearchCV(
+        model, space, n_iter=500, scoring="accuracy", n_jobs=-1, cv=cv, verbose=10, random_state=1)
+    # executer search
+    result = search.fit(X_train, y_train.data)
+    # summarize result
+    print("Best Score: %s" % result.best_score_)
+    print("Best Hyperparameters: %s" % result.best_params_)
+
+    return result
 
 
 if __name__ == "__main__":
@@ -78,18 +106,21 @@ if __name__ == "__main__":
 
     print("Reading data, preprocessing...")
 
-    # donner en input des représentations word2vec
+    # lire les fichiers
     train_data = read_data(train_file, dataset_name)
     test_data = read_data(dev_file, dataset_name)
 
+    # représentations word2vec
     train_corpus = list(read_corpus(train_data))
     test_corpus = list(read_corpus(test_data))
 
     # X = sentence
     # y = label
     X_train = convert_to_matrix(train_corpus, train_data)
+    #X_train.append(X_train, prob_parse_train, axis=1)
     y_train = train_data["label"].to_numpy()
     X_test = convert_to_matrix(test_corpus, test_data)
+    #X_test.append(X_test, prob_parse_test, axis=1)
     y_test = test_data["label"].to_numpy()
 
     print("Training model...")
@@ -97,7 +128,8 @@ if __name__ == "__main__":
     # fit le model aux données de train
     mlp = MLPClassifier(
         max_iter=2000, hidden_layer_sizes=(100, 5), verbose=True)
-    mlp.fit(X_train, y_train.data)
+
+    mlp = train_model(mlp, X_train, y_train)
 
     predict_train = mlp.predict(X_train)
     predict_test = mlp.predict(X_test)
@@ -108,5 +140,6 @@ if __name__ == "__main__":
     print("###################################")
     print(confusion_matrix(y_test, predict_test))
     print(classification_report(y_test, predict_test))
+
 
 # %%
