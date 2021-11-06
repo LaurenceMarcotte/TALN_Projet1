@@ -17,7 +17,7 @@ import gensim.parsing as parsing
 from BiLSTM import LSTM
 
 
-class Text_dataset(Dataset):
+class TextDataset(Dataset):
     def __init__(self, dataset_name, path, file_name, max_length, preprocess):
         self.path = path
         self.file = file_name
@@ -26,12 +26,13 @@ class Text_dataset(Dataset):
         # lecture fichier sous forme tsv
         self.data = pd.read_csv(os.path.join(self.path, self.file), sep='\t')
 
-        # standardization des données, i.e. création des colonnes 'sentence' et 'label' contenant les phrases exemples et
-        # les classes associées
+        # standardization des données, i.e. création des colonnes 'sentence' et 'label' contenant les phrases
+        # exemples et les classes associées
         if self.dataset_name == 'cola':
             self.data.columns = ["id", "label", "label2", "sentence"]
         elif self.dataset_name == 'qqp':
-            self.data = self.data.rename(columns={'question1': 'sentence', 'question2': 'sentence2', 'is_duplicate': 'label'})
+            self.data = self.data.rename(columns={'question1': 'sentence', 'question2': 'sentence2',
+                                                  'is_duplicate': 'label'})
 
         self.preprocess(preprocess.setdefault('lower', True), preprocess.setdefault('remove_punc', True),
                         preprocess.setdefault('remove_numeric', True))
@@ -61,9 +62,11 @@ class Text_dataset(Dataset):
         Transforme toutes les phrases en séquence de chiffre correspondant à la rangée de la matrice d'embedding
         :param vocab: le vocabulaire du dataset
         """
-        self.data['sequence'] = self.data['tokens'].apply(lambda s: torch.tensor(vocab.lookup_indices(s), dtype=torch.long))
+        self.data['sequence'] = self.data['tokens'].apply(lambda s: torch.tensor(vocab.lookup_indices(s),
+                                                                                 dtype=torch.long))
         if self.dataset_name == 'qqp':
-            self.data['sequence2'] = self.data['tokens2'].apply(lambda s: torch.tensor(vocab.lookup_indices(s), dtype=torch.long))
+            self.data['sequence2'] = self.data['tokens2'].apply(lambda s: torch.tensor(vocab.lookup_indices(s),
+                                                                                       dtype=torch.long))
 
     def get_sentences(self):
         """
@@ -81,7 +84,7 @@ class Text_dataset(Dataset):
         :return: la phrase après l'ajout des <pad>
         """
         if len(s) <= self.max_length:
-            for _ in range(self.max_length-len(s)):
+            for _ in range(self.max_length - len(s)):
                 s.append('<pad>')
         else:
             diff = len(s) - self.max_length
@@ -125,8 +128,8 @@ def create_vocabulary_and_embedding_matrix(train, test, embeddings):
     :param embeddings: les plongements de mots de FastTest
     :return: vocabulaire et la matrice des plongements de mots qui sera à donner au modèle RNN
     """
-    counter = Counter([t for s in train for t in s]+[t for s in test for t in s])
-    voc = torchtext.vocab.build_vocab_from_iterator(train+test)
+    counter = Counter([t for s in train for t in s] + [t for s in test for t in s])
+    voc = torchtext.vocab.build_vocab_from_iterator(train + test)
     embedding_voc = embeddings.itos
 
     for word, i in voc.get_stoi().items():
@@ -140,7 +143,7 @@ def create_vocabulary_and_embedding_matrix(train, test, embeddings):
         vector = embeddings[word]
         embedding_matrix[i] = vector
 
-    embedding_matrix=torch.from_numpy(embedding_matrix)
+    embedding_matrix = torch.from_numpy(embedding_matrix)
     return voc, embedding_matrix
 
 
@@ -154,7 +157,7 @@ def train(epoch, model, dataloader, optimizer, batch_size, progress_bar, print_e
     :param batch_size: la taille des batchs
     :param progress_bar: si on affiche la bar de progrès ou non
     :param print_every: à combien d'itérations est-ce qu'on affiche
-    :log_comet: True si on log les métriques sur comet.ml
+    :param log_comet: True si on log les métriques sur comet.ml
     :return: la loss moyenne et la performance moyenne par rapport à l'époque
     """
     model.train()
@@ -163,7 +166,7 @@ def train(epoch, model, dataloader, optimizer, batch_size, progress_bar, print_e
     losses = []
     total_iters = 0
     model.float()
-    nllloss = torch.nn.NLLLoss() # la loss qu'on va utiliser
+    nllloss = torch.nn.NLLLoss()  # la loss qu'on va utiliser
     for idx, batch in enumerate(
             tqdm(
                 dataloader, desc="Epoch {0}".format(epoch), disable=(not progress_bar)
@@ -183,11 +186,11 @@ def train(epoch, model, dataloader, optimizer, batch_size, progress_bar, print_e
         loss = nllloss(log_probas, batch["label"])
         losses.append(loss.item())
         loss.backward()
-        optimizer.step() # on optimize ici
+        optimizer.step()  # on optimize ici
 
         # eval accuracy
         pred = torch.argmax(log_probas, dim=1)
-        accuracy = torch.where(pred == batch['label'], 1, 0).sum()/batch_size
+        accuracy = torch.where(pred == batch['label'], 1, 0).sum() / batch_size
         total_iters += 1
         accuracy_train.append(accuracy)
 
@@ -196,8 +199,8 @@ def train(epoch, model, dataloader, optimizer, batch_size, progress_bar, print_e
 
         # ajoute les métriques sur comet.ml
         if log_comet:
-            experiment.log_metric("train_accuracy", accuracy.item(), step=idx+len(dataloader)*epoch, epoch=epoch)
-            experiment.log_metric("train_loss", loss.item(), step=idx+len(dataloader)*epoch, epoch=epoch)
+            experiment.log_metric("train_accuracy", accuracy.item(), step=idx + len(dataloader) * epoch, epoch=epoch)
+            experiment.log_metric("train_loss", loss.item(), step=idx + len(dataloader) * epoch, epoch=epoch)
 
     mean_loss = np.mean(losses)
     mean_loss /= batch_size
@@ -209,7 +212,8 @@ def train(epoch, model, dataloader, optimizer, batch_size, progress_bar, print_e
     return mean_loss, mean_acc
 
 
-def evaluate(epoch, model, dataloader, batch_size, progress_bar, print_every, mode="val", log_comet=False, log_confusion_matrix=False):
+def evaluate(epoch, model, dataloader, batch_size, progress_bar, print_every, mode="val", log_comet=False,
+             log_confusion_matrix=False):
     """
     Évalue le modèle sur un dataset de validation
     :param epoch: l'époque à laquelle on est rendue
@@ -219,7 +223,7 @@ def evaluate(epoch, model, dataloader, batch_size, progress_bar, print_every, mo
     :param progress_bar: si on affiche la bar de progrès ou non
     :param print_every: à combien d'itérations on affiche
     :param mode: si on est en mode évaluation ou test
-    :log_comet: True si on log les métriques sur comet.ml
+    :param log_comet: True si on log les métriques sur comet.ml
     :param log_confusion_matrix: si on crée une matrice de confusion ou non
     :return: la loss et la performance moyenne sur le dataset
     """
@@ -250,7 +254,7 @@ def evaluate(epoch, model, dataloader, batch_size, progress_bar, print_every, mo
             total_iters += batch["seq"].shape[1]
             # eval accuracy
             pred = torch.argmax(log_probas, dim=1)
-            accuracy = torch.where(pred == batch['label'], 1, 0).sum()/batch_size
+            accuracy = torch.where(pred == batch['label'], 1, 0).sum() / batch_size
             accuracy_eval.append(accuracy)
 
             if log_confusion_matrix:
@@ -280,20 +284,25 @@ def evaluate(epoch, model, dataloader, batch_size, progress_bar, print_every, mo
 
 def make_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--path', type=str, default='./data/CoLA')
-    parser.add_argument('--dataset_name', type=str, default='cola')
-    parser.add_argument('--file_type', type=str, default='tsv')
-    parser.add_argument('--vocab_saved', action='store_true', default=False)
-    parser.add_argument('--vocab_to_save', action='store_true', default=True)
-    parser.add_argument('--learning_rate', type=float, default=1e-4)
-    parser.add_argument('--hidden_size', type=int, default=150)
-    parser.add_argument('--num_layers', type=int, default=1)
-    parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--weight_decay', type=float, default=5e-4)
-    parser.add_argument('--epochs', type=int, default=3)
-    parser.add_argument('--print_every', type=int, default=10)
-    parser.add_argument('--progress_bar', action='store_true', default=True)
-    parser.add_argument('--comet', action='store_true', default=True)
+    parser.add_argument('--path', type=str, default='./data/CoLA', help='Folder to where the data is saved')
+    parser.add_argument('--dataset_name', type=str, default='cola', help='name of the dataset')
+    parser.add_argument('--file_type', type=str, default='tsv', help="Type of file of the dataset (.csv, .tsv)")
+    parser.add_argument('--vocab_saved', action='store_true', default=False,
+                        help="Use if vocab has been computed before"
+                             " and saved")
+    parser.add_argument('--vocab_to_save', action='store_true', default=True, help="Use if you want to save the "
+                                                                                   "vocabulary and embedding matrix")
+    parser.add_argument('--learning_rate', type=float, default=1e-4, help="Learning rate")
+    parser.add_argument('--hidden_size', type=int, default=150, help="The size of the hidden_size for the lstm")
+    parser.add_argument('--num_layers', type=int, default=1, help="The number of layers for the lstm")
+    parser.add_argument('--batch_size', type=int, default=64, help="The size of the batch for training and eval")
+    parser.add_argument('--weight_decay', type=float, default=5e-4,
+                        help="The value for the weight decay in the optimizer AdamW")
+    parser.add_argument('--epochs', type=int, default=3, help="The number of epochs to train")
+    parser.add_argument('--print_every', type=int, default=10, help="After how many steps do you want to print info")
+    parser.add_argument('--progress_bar', action='store_true', default=False, help="If you want to show the progress")
+    parser.add_argument('--comet', action='store_true', default=False,
+                        help="Use if you want to log metrics on comet.ml")
 
     return parser
 
@@ -311,7 +320,6 @@ if __name__ == '__main__':
             project_name="projet-1-nlp",
             workspace="floui",
         )
-
 
     path = args.path
     dataset_name = args.dataset_name
@@ -351,7 +359,6 @@ if __name__ == '__main__':
         }
         experiment.log_parameters(hyper_params)
 
-
     print('Loading embeddings')
     embeddings = torchtext.vocab.FastText('simple')
     embedding_size = embeddings.dim
@@ -359,17 +366,17 @@ if __name__ == '__main__':
     preprocess = {'lower': True, 'remove_punc': True, 'remove_numeric': True}
 
     print('Loading data and preprocessing')
-    train_data = Text_dataset(dataset_name, path, 'train.'+file_type, max_document_length, preprocess)
-    test_data = Text_dataset(dataset_name, path, 'dev.'+file_type, max_document_length, preprocess)
+    train_data = TextDataset(dataset_name, path, 'train.' + file_type, max_document_length, preprocess)
+    test_data = TextDataset(dataset_name, path, 'dev.' + file_type, max_document_length, preprocess)
 
     print('Creating vocab and embedding matrix')
     # si on a déjà créé et enregistré le vocabulaire et la matrice d'embedding, on va simplement les chercher plutôt
     # que de les créer à nouveau
     if saved:
-        vocab_file = open(dataset_name+'_vocab.p', 'rb')
+        vocab_file = open(dataset_name + '_vocab.p', 'rb')
         vocab = pickle.load(vocab_file)
-        emb_matrix_file = open(dataset_name+'_emb_matrix.p', 'rb')
-        embedding_matrix=pickle.load(emb_matrix_file)
+        emb_matrix_file = open(dataset_name + '_emb_matrix.p', 'rb')
+        embedding_matrix = pickle.load(emb_matrix_file)
     else:
         sentence_train = train_data.get_sentences()
         sentence_test = test_data.get_sentences()
@@ -379,10 +386,10 @@ if __name__ == '__main__':
 
     # on sauvegarde le vocabulaire et la matrice d'embedding
     if save:
-        vocab_file = open(dataset_name+'_vocab.p', 'wb')
+        vocab_file = open(dataset_name + '_vocab.p', 'wb')
         pickle.dump(vocab, vocab_file)
 
-        emb_matrix_file = open(dataset_name+'_emb_matrix.p', 'wb')
+        emb_matrix_file = open(dataset_name + '_emb_matrix.p', 'wb')
         pickle.dump(embedding_matrix, emb_matrix_file)
 
     print('Transforming sentences to sequences of ints')
@@ -390,7 +397,7 @@ if __name__ == '__main__':
     test_data.to_sequence(vocab)
 
     # on génère l'ensemble de validation pour l'entraînement
-    train_size = int(len(train_data)*dev_size)
+    train_size = int(len(train_data) * dev_size)
     dev_size = len(train_data) - train_size
     train_data, valid_data = random_split(train_data, [train_size, dev_size])
 
@@ -426,12 +433,12 @@ if __name__ == '__main__':
         train_losses.append(loss)
         train_acc.append(acc)
 
-        if epoch == epochs-1:
+        if epoch == epochs - 1:
             log_confusion_matrix = True
 
-        loss, acc = evaluate(epoch, model, dev_loader, batch_size, progress_bar, print_every, log_comet=comet, log_confusion_matrix=log_confusion_matrix)
+        loss, acc = evaluate(epoch, model, dev_loader, batch_size, progress_bar, print_every, log_comet=comet,
+                             log_confusion_matrix=log_confusion_matrix)
         valid_losses.append(loss)
         valid_acc.append(acc)
-
 
     experiment.end()
