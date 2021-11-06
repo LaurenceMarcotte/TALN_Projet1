@@ -6,8 +6,6 @@ and by the code from the LSTM implementation done during the course IFT6135
 """
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torchtext.vocab import FastText
 
 
 class LSTM(nn.Module):
@@ -19,6 +17,8 @@ class LSTM(nn.Module):
             num_layers=1,
             pad_index=0,
             num_class=2,
+            num_add_feature=1,
+            dropout_prob=0.2,
             learn_embeddings=False,
             _embedding_weight=None,
             similarity_task=False
@@ -31,9 +31,12 @@ class LSTM(nn.Module):
         self.num_layers = num_layers
         self.learn_embeddings = learn_embeddings
         self.similarity_task = similarity_task
+        # nombre de passage dans le lstm (2 si similarity task)
         self.num_lstm = 2 if self.similarity_task else 1
-        self.direction = 2
-        self.num_class = num_class
+        self.direction = 2  # si bilstm il y a 2 direction sinon 1
+        self.num_class = num_class  # nombre de classes
+        self.num_add_feature = num_add_feature  # si on ajoute des features en plus des phrases quand on fait la classification
+        self.dropout_prob = dropout_prob  # la probabilité de dropout
 
         self.embedding = nn.Embedding(
             vocabulary_size, embedding_size, padding_idx=pad_index, _weight=_embedding_weight
@@ -41,15 +44,16 @@ class LSTM(nn.Module):
         self.lstm_a = nn.LSTM(
             embedding_size, hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True
         )
-        if self.similarity_task:
-            self.lstm_b = nn.LSTM(
-                embedding_size, hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True
-            )
+
+        # if self.similarity_task:
+        #     self.lstm_b = nn.LSTM(
+        #         embedding_size, hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True
+        #     )
 
         self.classifier = nn.Sequential(
-            nn.Linear(hidden_size * self.num_lstm * self.direction, embedding_size),
-            # nn.ReLU(),
-            # nn.Linear(embedding_size, self.num_class, bias=False),
+            nn.BatchNorm1d(hidden_size * (self.num_lstm + self.num_add_feature) * self.direction),
+            nn.Dropout(p=self.dropout_prob),
+            nn.Linear(hidden_size * (self.num_lstm + self.num_add_feature) * self.direction, self.num_class, bias=False),
         )
 
         # Tying classifier and embedding weights (similar to GPT-1)
@@ -93,11 +97,15 @@ class LSTM(nn.Module):
         """
         embedded_input = self.embedding(inputs1)
         lstm_output, (h, c) = self.lstm_a(embedded_input, hidden_states1)
+        lstm_output = torch.cat((h[-2, :, :], h[-1, :, :]), 1)
+
         if self.similarity_task:
             embedded_input2 = self.embedding(inputs2)
-            lstm_output2, (h2, c2) = self.lstm_b(embedded_input2, hidden_states2)
-            lstm_output = torch.cat((h[-2, :, :], h[-1, :, :], h2[-2, :, :], h2[-1, :, :]), 1)
-        classifier_output=self.classifier(lstm_output)
+            lstm_output2, (h2, c2) = self.lstm_a(embedded_input2, hidden_states2)
+            sent_sub1, sent_sub2 = h[-2, :, :] - h2[-2, :, :], h[-1, :, :] - h2[-1, :, :]
+            lstm_output = torch.cat((h[-2, :, :], h[-1, :, :], h2[-2, :, :], h2[-1, :, :], sent_sub1, sent_sub2), 1)
+
+        classifier_output = self.classifier(lstm_output)
         log_proba = self.softmax(classifier_output)
         return log_proba, (h, c)
 
