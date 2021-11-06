@@ -287,10 +287,11 @@ def make_parser():
     parser.add_argument('--path', type=str, default='./data/CoLA', help='Folder to where the data is saved')
     parser.add_argument('--dataset_name', type=str, default='cola', help='name of the dataset')
     parser.add_argument('--file_type', type=str, default='tsv', help="Type of file of the dataset (.csv, .tsv)")
+    parser.add_argument('--max_sentence_length', type=int, default=100, help="The maximum length for a sentence")
     parser.add_argument('--vocab_saved', action='store_true', default=False,
                         help="Use if vocab has been computed before"
                              " and saved")
-    parser.add_argument('--vocab_to_save', action='store_true', default=True, help="Use if you want to save the "
+    parser.add_argument('--vocab_to_save', action='store_true', default=False, help="Use if you want to save the "
                                                                                    "vocabulary and embedding matrix")
     parser.add_argument('--learning_rate', type=float, default=1e-4, help="Learning rate")
     parser.add_argument('--hidden_size', type=int, default=150, help="The size of the hidden_size for the lstm")
@@ -329,7 +330,7 @@ if __name__ == '__main__':
     lr = args.learning_rate
     batch_size = args.batch_size
     dropout_keep_prob = 0.5
-    max_document_length = 100  # each sentence has until 100 words
+    max_document_length = args.max_sentence_length  # each sentence has until 100 words
     dev_size = 0.8  # split percentage to train\validation data
     # max_size = 2e5  # maximum vocabulary size
     seed = 42
@@ -433,7 +434,7 @@ if __name__ == '__main__':
         train_losses.append(loss)
         train_acc.append(acc)
 
-        if epoch == epochs - 1:
+        if epoch == epochs - 1 and comet:
             log_confusion_matrix = True
 
         loss, acc = evaluate(epoch, model, dev_loader, batch_size, progress_bar, print_every, log_comet=comet,
