@@ -5,7 +5,9 @@ import pandas as pd
 import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import RepeatedStratifiedKFold
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import RandomizedSearchCV, GridSearchCV, ParameterGrid
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 
 import gensim
 
@@ -24,6 +26,7 @@ def make_parser():
     parser.add_argument('--train_file', type=str)
     parser.add_argument('--dev_file', type=str)
     parser.add_argument('--dataset_name', type=str)
+    parser.add_argument('--representation', type=str)
     return parser
 
 
@@ -72,27 +75,80 @@ def convert_to_matrix(corpus, data, vector_size=30):
     return stv
 
 
+def train_model_frequency(X_train, y_train):
+    pipeline = Pipeline(
+        [
+            ("vect", CountVectorizer(binary=True)),
+            ("clf", MLPClassifier()),
+        ]
+    )
+
+    # hyperparamètre à explorer
+    parameters = {'vect__ngram_range': [[(1, 1)], [(1, 2)], [(2, 2)], [(3, 3)]], 'clf__hidden_layer_sizes': [(50,), (100, 50), (100, 50, 50), (100, 50, 50, 50), (100, 50, 50, 50, 50)],
+                  'clf__alpha': ([1], [0.1], [0.01], [0.001], [0.0001], [0])}
+
+    params = list(ParameterGrid(parameters))
+    #cv = RepeatedStratifiedKFold()
+
+    gs_clf = GridSearchCV(pipeline, param_grid=params,
+                          cv=5, n_jobs=-1, refit=True, scoring='accuracy')
+
+    model = gs_clf.fit(X_train, y_train)
+
+    print("Best Score: %s" % model.best_score_)
+    print("Best Hyperparameters: %s" % model.best_params_)
+
+    return model
+
+
 def train_model(model, X_train, y_train, max_nodes=100, nodes_step=5):
     # exploration des hyperparamètres
     # code inspiré de https://machinelearningmastery.com/hyperparameter-optimization-with-random-search-and-grid-search/
     # define evaluation
-    cv = RepeatedStratifiedKFold(n_splits=10, n_repeats=3, random_state=1)
+    #cv = RepeatedStratifiedKFold()
+
     # define search space
     space = dict()
-    space["hidden_layer_sizes"] = [(100,), (100,50,), (100,50,100), (50,100,), (25, 50, 100)]
-    space["activation"] = ["identity", "logistic", "tanh", "relu"]
-    space["solver"] = ["lbfgs", "sgd", "adam"]
+    space["hidden_layer_sizes"] = [
+        (50,), (100, 50), (100, 50, 50), (100, 50, 50, 50), (100, 50, 50, 50, 50)]
     space["alpha"] = np.array([1, 0.1, 0.01, 0.001, 0.0001, 0])
+
     # define search
     search = RandomizedSearchCV(
-        model, space, n_iter=500, scoring="accuracy", n_jobs=-1, cv=cv, verbose=10, random_state=1)
+        model, space, n_iter=20, scoring="accuracy", n_jobs=-1, cv=5, verbose=1, random_state=1)
     # executer search
-    result = search.fit(X_train, y_train.data)
+    result = search.fit(X_train, y_train)
     # summarize result
     print("Best Score: %s" % result.best_score_)
     print("Best Hyperparameters: %s" % result.best_params_)
 
     return result
+
+
+def test_sentence(sentence):
+    # split la phrase en tokens
+    # mettre à 0 si: termine par conjonction de coordination, deux mots pareils qui se suivent, commence par un pronom objet
+    tokenized_sentence = sentence.split(" ")
+    object_pronouns = ["me", "him", "us"]
+    reflexive_pronouns = ["them", "myself", "yourself", "himself",
+                          "herself", "itself", "ourselves", "yourselves", "themselves"]
+    possessive_pronouns = ["mine", "yours", "ours", "yours", "theirs"]
+    coordinating_conjunctions = ["and", "but", "or", "so"]
+    punctuation = ["!", "?", "."]
+
+    if tokenized_sentence[0] in object_pronouns or reflexive_pronouns or possessive_pronouns:
+        return 0
+
+    if tokenized_sentence[-1] in punctuation:
+        if tokenized_sentence[-2] in coordinating_conjunctions:
+            return 0
+        else:
+            return 1
+    else:
+        if tokenized_sentence[-1] in coordinating_conjunctions:
+            return 0
+        else:
+            return 0
 
 
 if __name__ == "__main__":
@@ -103,33 +159,43 @@ if __name__ == "__main__":
     train_file = args.train_file
     dev_file = args.dev_file
     dataset_name = args.dataset_name
+    representation = args.representation
 
     print("Reading data, preprocessing...")
 
     # lire les fichiers
     train_data = read_data(train_file, dataset_name)
     test_data = read_data(dev_file, dataset_name)
+    if representation == "semantic":
+        # # représentations word2vec
+        train_corpus = list(read_corpus(train_data))
+        test_corpus = list(read_corpus(test_data))
 
-    # représentations word2vec
-    train_corpus = list(read_corpus(train_data))
-    test_corpus = list(read_corpus(test_data))
+        X_train = convert_to_matrix(train_corpus, train_data)
+        y_train = train_data["label"].to_numpy()
+        X_test = convert_to_matrix(test_corpus, test_data)
+        y_test = test_data["label"].to_numpy()
 
-    # X = sentence
-    # y = label
-    X_train = convert_to_matrix(train_corpus, train_data)
-    #X_train.append(X_train, prob_parse_train, axis=1)
-    y_train = train_data["label"].to_numpy()
-    X_test = convert_to_matrix(test_corpus, test_data)
-    #X_test.append(X_test, prob_parse_test, axis=1)
-    y_test = test_data["label"].to_numpy()
+        #X_train.append(X_train, prob_parse_train, axis=1)
+        #X_test.append(X_test, prob_parse_test, axis=1)
+
+    if representation == "frequency":
+        X_train = train_data["sentence"]
+        y_train = train_data["label"]
+        X_test = test_data["sentence"]
+        y_test = test_data["label"]
 
     print("Training model...")
 
     # fit le model aux données de train
-    mlp = MLPClassifier(
-        max_iter=2000, hidden_layer_sizes=(100, 5), verbose=True)
 
-    mlp = train_model(mlp, X_train, y_train)
+    if representation == "frequency":
+        mlp = train_model_frequency(X_train, y_train)
+
+    else:
+        mlp = MLPClassifier(
+            max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
+        mlp = train_model(mlp, X_train, y_train)
 
     predict_train = mlp.predict(X_train)
     predict_test = mlp.predict(X_test)
