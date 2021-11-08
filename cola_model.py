@@ -128,27 +128,29 @@ def train_model(model, X_train, y_train, max_nodes=100, nodes_step=5):
 def test_sentence(sentence):
     # split la phrase en tokens
     # mettre à 0 si: termine par conjonction de coordination, deux mots pareils qui se suivent, commence par un pronom objet
-    tokenized_sentence = sentence.split(" ")
-    object_pronouns = ["me", "him", "us"]
-    reflexive_pronouns = ["them", "myself", "yourself", "himself",
-                          "herself", "itself", "ourselves", "yourselves", "themselves"]
-    possessive_pronouns = ["mine", "yours", "ours", "yours", "theirs"]
-    coordinating_conjunctions = ["and", "but", "or", "so"]
-    punctuation = ["!", "?", "."]
+    tokenized_sentence = sentence.lower().split(" ")
+    object_pronouns = {"me", "him", "us"}
+    reflexive_pronouns = {"them", "myself", "yourself", "himself",
+                          "herself", "itself", "ourselves", "yourselves", "themselves"}
+    possessive_pronouns = {"mine", "yours", "ours", "yours", "theirs"}
+    coordinating_conjunctions = {"and", "but", "or", "so"}
+    punctuation = {"!", "?", "."}
 
-    if tokenized_sentence[0] in object_pronouns or reflexive_pronouns or possessive_pronouns:
+    sentence_array = np.array(tokenized_sentence, dtype=str)
+    if np.any(sentence_array[:-1] == sentence_array[1:]):
         return 0
 
-    if tokenized_sentence[-1] in punctuation:
+    elif tokenized_sentence[0] in object_pronouns.union(reflexive_pronouns).union(possessive_pronouns):
+        return 0
+
+    elif tokenized_sentence[-1] in punctuation:
         if tokenized_sentence[-2] in coordinating_conjunctions:
             return 0
-        else:
-            return 1
-    else:
-        if tokenized_sentence[-1] in coordinating_conjunctions:
-            return 0
-        else:
-            return 0
+
+    elif tokenized_sentence[-1] in coordinating_conjunctions:
+        return 0
+
+    return 1
 
 
 if __name__ == "__main__":
@@ -192,10 +194,13 @@ if __name__ == "__main__":
     if representation == "frequency":
         mlp = train_model_frequency(X_train, y_train)
 
-    else:
-        mlp = MLPClassifier(
-            max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
-        mlp = train_model(mlp, X_train, y_train)
+    if representation == "semantic":
+        if dataset_name == "cola":
+            mlp = MLPClassifier(
+                max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
+            mlp.fit(X_train, y_train)
+        else:
+            mlp = train_model(mlp, X_train, y_train)
 
     predict_train = mlp.predict(X_train)
     predict_test = mlp.predict(X_test)
