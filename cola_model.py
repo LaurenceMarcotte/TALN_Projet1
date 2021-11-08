@@ -194,12 +194,22 @@ if __name__ == "__main__":
     if representation == "frequency":
         mlp = train_model_frequency(X_train, y_train)
 
+<<<<<<< HEAD
     if representation == "semantic":
         if dataset_name == "cola":
             mlp = MLPClassifier(
                 max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
             mlp.fit(X_train, y_train)
         else:
+=======
+    else:
+        if dataset_name == "cola":
+            mlp = MLPClassifier(
+                max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
+        else :
+            mlp = MLPClassifier(
+                max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
+>>>>>>> 981cbe8fa59bf78f489fcb27d4b777295b31d4ba
             mlp = train_model(mlp, X_train, y_train)
 
     predict_train = mlp.predict(X_train)
