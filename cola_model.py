@@ -199,22 +199,24 @@ if __name__ == "__main__":
             mlp = MLPClassifier(
                 max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
             mlp.fit(X_train, y_train)
+            predict_train = mlp.predict(X_train)
+            predict_test = mlp.predict(X_test)
+
+            # Tests manuels
+            # positions des phrases agrammaticales
+            idx_where_0train = [i for i in range(
+                train_data.shape[0]) if not test_sentence(train_data["sentence"].loc[i])]
+            idx_where_0test = [i for i in range(
+                test_data.shape[0]) if not test_sentence(test_data["sentence"].loc[i])]
+
+            # On met manuellement ces phrases à 0
+            predict_train[idx_where_0train] = 0
+            predict_test[idx_where_0test] = 0
+
         else:
             mlp = train_model(mlp, X_train, y_train)
-
-    predict_train = mlp.predict(X_train)
-    predict_test = mlp.predict(X_test)
-
-    # Tests manuels
-
-    # positions des phrases agrammaticales
-    idx_where_0train = [i for i in range(
-        train_data.shape[0]) if not test_sentence(train_data["sentence"].loc[i])]
-    idx_where_0test = [i for i in range(
-        test_data.shape[0]) if not test_sentence(test_data["sentence"].loc[i])]
-    # On met manuellement ces phrases à 0
-    predict_train[idx_where_0train] = 0
-    predict_test[idx_where_0test] = 0
+            predict_train = mlp.predict(X_train)
+            predict_test = mlp.predict(X_test)
 
     # print les résultats
     print(confusion_matrix(y_train, predict_train))
