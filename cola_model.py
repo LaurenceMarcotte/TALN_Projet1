@@ -193,9 +193,13 @@ if __name__ == "__main__":
         mlp = train_model_frequency(X_train, y_train)
 
     else:
-        mlp = MLPClassifier(
-            max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
-        mlp = train_model(mlp, X_train, y_train)
+        if dataset_name == "cola":
+            mlp = MLPClassifier(
+                max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
+        else :
+            mlp = MLPClassifier(
+                max_iter=2000, hidden_layer_sizes=(50, 50, 50, 50), alpha=0, activation="logistic", verbose=False)
+            mlp = train_model(mlp, X_train, y_train)
 
     predict_train = mlp.predict(X_train)
     predict_test = mlp.predict(X_test)
