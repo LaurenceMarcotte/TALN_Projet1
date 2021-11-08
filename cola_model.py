@@ -133,7 +133,7 @@ def test_sentence(sentence):
     reflexive_pronouns = {"them", "myself", "yourself", "himself",
                           "herself", "itself", "ourselves", "yourselves", "themselves"}
     possessive_pronouns = {"mine", "yours", "ours", "yours", "theirs"}
-    coordinating_conjunctions = {"and", "but", "or", "so"}
+    coordinating_conjunctions = {"and", "but", "or"}
     punctuation = {"!", "?", "."}
 
     sentence_array = np.array(tokenized_sentence, dtype=str)
@@ -204,6 +204,17 @@ if __name__ == "__main__":
 
     predict_train = mlp.predict(X_train)
     predict_test = mlp.predict(X_test)
+
+    # Tests manuels
+
+    # positions des phrases agrammaticales
+    idx_where_0train = [i for i in range(
+        train_data.shape[0]) if not test_sentence(train_data["sentence"].loc[i])]
+    idx_where_0test = [i for i in range(
+        test_data.shape[0]) if not test_sentence(test_data["sentence"].loc[i])]
+    # On met manuellement ces phrases à 0
+    predict_train[idx_where_0train] = 0
+    predict_test[idx_where_0test] = 0
 
     # print les résultats
     print(confusion_matrix(y_train, predict_train))
