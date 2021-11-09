@@ -299,6 +299,7 @@ def make_parser():
     parser.add_argument('--batch_size', type=int, default=64, help="The size of the batch for training and eval")
     parser.add_argument('--weight_decay', type=float, default=5e-4,
                         help="The value for the weight decay in the optimizer AdamW")
+    parser.add_argument('--dropout', type=float, default=0.5, help="The probability to keep a neuron active (dropout)")
     parser.add_argument('--epochs', type=int, default=3, help="The number of epochs to train")
     parser.add_argument('--print_every', type=int, default=10, help="After how many steps do you want to print info")
     parser.add_argument('--progress_bar', action='store_true', default=False, help="If you want to show the progress")
@@ -329,7 +330,7 @@ if __name__ == '__main__':
     # hyper-parameters:
     lr = args.learning_rate
     batch_size = args.batch_size
-    dropout_keep_prob = 0.5
+    dropout_keep_prob = args.dropout
     max_document_length = args.max_sentence_length  # each sentence has until 100 words
     dev_size = 0.8  # split percentage to train\validation data
     # max_size = 2e5  # maximum vocabulary size
