@@ -3,6 +3,7 @@ import sys
 import argparse
 import pandas as pd
 import numpy as np
+from scipy.sparse import data
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import RepeatedStratifiedKFold
 from sklearn.model_selection import RandomizedSearchCV, GridSearchCV, ParameterGrid
@@ -192,7 +193,25 @@ if __name__ == "__main__":
     # fit le model aux données de train
 
     if representation == "frequency":
-        mlp = train_model_frequency(X_train, y_train)
+        if dataset_name == "cola":
+            mlp = train_model_frequency(X_train, y_train)
+            predict_train = mlp.predict(X_train)
+            predict_test = mlp.predict(X_test)
+
+            # Tests manuels
+            # positions des phrases agrammaticales
+            idx_where_0train = [i for i in range(
+                train_data.shape[0]) if not test_sentence(train_data["sentence"].loc[i])]
+            idx_where_0test = [i for i in range(
+                test_data.shape[0]) if not test_sentence(test_data["sentence"].loc[i])]
+
+            # On met manuellement ces phrases à 0
+            predict_train[idx_where_0train] = 0
+            predict_test[idx_where_0test] = 0
+        else:
+            mlp = train_model_frequency(X_train, y_train)
+            predict_train = mlp.predict(X_train)
+            predict_test = mlp.predict(X_test)
 
     if representation == "semantic":
         if dataset_name == "cola":
