@@ -37,10 +37,6 @@ def read_data(file_name: str, dataset_name: str) -> pd.DataFrame:
     elif dataset_name == 'qqp':
         data['sentence'] = data.apply(lambda row: row['question1'] + ' ' + row['question2'], axis=1)
         data = data.rename(columns={'is_duplicate': 'label'})
-    elif dataset_name == 'sst':
-        # TODO: Renommer les colonnes du dataframe contenant les phrases et les classes en "sentence" et "label" pour
-        #  sst
-        pass
 
     return data
 
@@ -54,7 +50,7 @@ def train_model(X_train, y_train):
         [
             ("vect", CountVectorizer()),
             ("tfidf", TfidfTransformer()),
-            ("clf", SGDClassifier(loss='log')),
+            ("clf", SGDClassifier(loss='log', class_weight="balanced")),
         ]
     )
     # hyperparamètre à explorer
