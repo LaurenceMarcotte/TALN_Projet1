@@ -58,6 +58,8 @@ def train(epoch, model, dataloader, optimizer, batch_size, progress_bar, print_e
 
         # eval accuracy
         pred = torch.argmax(log_probas, dim=1)
+        if dataloader.dataset.dataset.dataset_name == 'cola':
+            pred[torch.where(batch["rule"] == 0, True, False).squeeze(-1)] = 0
         accuracy = torch.where(pred == batch['label'], 1, 0).sum() / batch_size
         total_iters += 1
         accuracy_train.append(accuracy.item())
@@ -117,6 +119,8 @@ def evaluate(epoch, model, dataloader, batch_size, progress_bar, print_every, be
 
             # eval accuracy
             pred = torch.argmax(log_probas, dim=1)
+            if dataloader.dataset.dataset.dataset_name == 'cola':
+                pred[torch.where(batch["rule"] == 0, True, False).squeeze(-1)] = 0
             accuracy = torch.where(pred == batch['label'], 1, 0).sum() / batch_size
             accuracy_eval.append(accuracy.item())
 
@@ -169,6 +173,9 @@ def make_parser():
     parser.add_argument('--device', choices=['cpu', 'cuda'],
                         help="The device on which to train de model, either cpu or "
                              "cuda")
+    parser.add_argument('--best_model', action='store_true', default=False, help="Create the model based on the best "
+                                                                                 "hyperparameters obtained for each "
+                                                                                 "dataset.")
 
     return parser
 
@@ -185,9 +192,8 @@ if __name__ == '__main__':
     lr = args.learning_rate
     batch_size = args.batch_size
     dropout_keep_prob = args.dropout
-    max_document_length = args.max_sentence_length  # each sentence has until 100 words
+    max_document_length = args.max_sentence_length  # each sentence has until this number of words
     dev_size = 0.8  # split percentage to train\validation data
-    # max_size = 2e5  # maximum vocabulary size
     seed = 42
     num_classes = 2
     save = args.vocab_to_save
@@ -198,6 +204,29 @@ if __name__ == '__main__':
     epochs = args.epochs
     print_every = args.print_every
     progress_bar = args.progress_bar
+
+    if args.best_model:
+        lr = 3e-4
+        batch_size = 64
+        hidden_size = 150
+        weight_decay = 5e-4
+        if dataset_name == 'cola':
+            dropout_keep_prob = 0.2
+            max_document_length = 44
+            num_layers = 5
+            epochs = 12
+        elif dataset_name == 'qqp':
+            dropout_keep_prob = 0.5
+            max_document_length = 40
+            num_layers = 2
+            epochs = 20
+        elif dataset_name == 'sst':
+            dropout_keep_prob = 0.5
+            max_document_length = 52
+            num_layers = 2
+            epochs = 15
+
+    print(max_document_length)
 
     device = args.device
 
@@ -250,7 +279,8 @@ if __name__ == '__main__':
     # on génère l'ensemble de validation pour l'entraînement
     train_size = int(len(train_data) * dev_size)
     dev_size = len(train_data) - train_size
-    train_data, valid_data = random_split(train_data, [train_size, dev_size])
+    train_data, valid_data = random_split(train_data, [train_size, dev_size],
+                                          generator=torch.Generator().manual_seed(seed))
 
     # on génère les dataloader de chaque dataset
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)

@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
@@ -42,6 +43,8 @@ class TextDataset(Dataset):
         sentence = self.data['sequence'].iloc[item]
         label = self.data['label'].iloc[item]
         sample = {'seq': sentence, 'label': label, 'id': torch.tensor([item])}
+        if self.dataset_name == "cola":
+            sample["rule"] = self.data["rule"].iloc[item]
         if self.dataset_name == 'qqp':
             common = self.data['common'].iloc[item]
             sample = {'seq': sentence, 'seq2': self.data['sequence2'].iloc[item], 'label': label,
@@ -97,6 +100,34 @@ class TextDataset(Dataset):
             s = s[diff:]
         return s
 
+    def test_sentence(self, sentence):
+        # split la phrase en tokens
+        # mettre à 0 si: termine par conjonction de coordination, deux mots pareils qui se suivent, commence par un pronom objet
+        tokenized_sentence = sentence.lower().split(" ")
+
+        object_pronouns = {"me", "him", "us"}
+        reflexive_pronouns = {"them", "myself", "yourself", "himself",
+                              "herself", "itself", "ourselves", "yourselves", "themselves"}
+        possessive_pronouns = {"mine", "yours", "ours", "yours", "theirs"}
+        coordinating_conjunctions = {"and", "but", "or"}
+        punctuation = {"!", "?", "."}
+
+        sentence_array = np.array(tokenized_sentence, dtype=str)
+        if np.any(sentence_array[:-1] == sentence_array[1:]):
+            return torch.tensor([0])
+
+        elif tokenized_sentence[0] in object_pronouns.union(reflexive_pronouns).union(possessive_pronouns):
+            return torch.tensor([0])
+
+        elif tokenized_sentence[-1] in punctuation:
+            if tokenized_sentence[-2] in coordinating_conjunctions:
+                return torch.tensor([0])
+
+        elif tokenized_sentence[-1] in coordinating_conjunctions:
+            return torch.tensor([0])
+
+        return torch.tensor([1])
+
     def preprocess(self, lower=True, remove_punc=True, remove_numeric=True):
         """
         On preprocess les données
@@ -118,6 +149,9 @@ class TextDataset(Dataset):
 
         self.data['tokens'] = self.data['sentence'].apply(lambda s: parsing.preprocess_string(s, filters))
         self.data['tokens'] = self.data['tokens'].apply(lambda s: self.pad_sentence(s))
+
+        if self.dataset_name == "cola":
+            self.data["rule"] = self.data["sentence"].apply(lambda s: self.test_sentence(s))
 
         if self.dataset_name == 'qqp':
             self.data['tokens2'] = self.data['sentence2'].apply(lambda s: parsing.preprocess_string(s, filters))
