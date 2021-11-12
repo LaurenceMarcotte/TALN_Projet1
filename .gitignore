@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.vector_cache/wiki.simple.vec
 
 # C extensions
 *.so
@@ -133,3 +134,8 @@ dmypy.json
 
 # ignore data
 data/**/*.tsv
+
+.vector_cache
+
+# ignore pickle
+*.p
