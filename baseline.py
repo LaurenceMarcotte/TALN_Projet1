@@ -50,7 +50,7 @@ def train_model(X_train, y_train):
         [
             ("vect", CountVectorizer()),
             ("tfidf", TfidfTransformer()),
-            ("clf", SGDClassifier(loss='log')),
+            ("clf", SGDClassifier(loss='log', class_weight="balanced")),
         ]
     )
     # hyperparamètre à explorer
