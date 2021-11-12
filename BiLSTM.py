@@ -3,6 +3,8 @@ Code created by Laurence Marcotte
 
 inspired by https://github.com/Jackthebighead/duplicate-question-pair-identification/blob/master/model2/siamese_bilstm.ipynb
 and by the code from the LSTM implementation done during the course IFT6135
+
+This is the implementation of BiLSTM-embedding as explained in the report.
 """
 import torch
 import torch.nn as nn
@@ -37,6 +39,7 @@ class LSTM(nn.Module):
         self.num_class = num_class  # nombre de classes
         self.num_add_feature = num_add_feature  # si on ajoute des features en plus des phrases quand on fait la classification
         self.dropout_prob = dropout_prob  # la probabilité de dropout
+        self.cos_sim = nn.CosineSimilarity(dim=1)
 
         self.embedding = nn.Embedding(
             vocabulary_size, embedding_size, padding_idx=pad_index, _weight=_embedding_weight
@@ -45,50 +48,54 @@ class LSTM(nn.Module):
             embedding_size, hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True
         )
 
-        # if self.similarity_task:
-        #     self.lstm_b = nn.LSTM(
-        #         embedding_size, hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True
-        #     )
-
         self.classifier = nn.Sequential(
-            nn.BatchNorm1d(hidden_size * (self.num_lstm + self.num_add_feature) * self.direction),
+            nn.BatchNorm1d(hidden_size * (self.num_lstm + self.num_add_feature) * self.direction +
+                           2*int(self.similarity_task)),
             nn.Dropout(p=self.dropout_prob),
-            nn.Linear(hidden_size * (self.num_lstm + self.num_add_feature) * self.direction, self.num_class, bias=False),
+            nn.Linear(hidden_size * (self.num_lstm + self.num_add_feature) * self.direction +
+                      2*int(self.similarity_task), self.num_class, bias=False),
         )
-
-        # Tying classifier and embedding weights (similar to GPT-1)
-        #self.classifier[2].weight = self.embedding.weight
 
         # Freeze the embedding weights, depending on learn_embeddings
         self.embedding.requires_grad_(learn_embeddings)
 
         self.softmax = nn.LogSoftmax(dim=1)
 
-    def forward(self, inputs1, hidden_states1, inputs2=None, hidden_states2=None):
+    def forward(self, inputs1, hidden_states1, inputs2=None, hidden_states2=None, feature=None):
         """LSTM.
 
-        This is a Long Short-Term Memory network for language modeling. This
-        module returns for each position in the sequence the log-probabilities
-        of the next token. See Lecture 05, slides 42-60.
+        This is a Long Short-Term Memory network for classification. This
+        module returns for each example the probability for belonging in a class.
 
         Parameters
         ----------
-        inputs (`torch.LongTensor` of shape `(batch_size, sequence_length)`)
+        inputs1 (`torch.LongTensor` of shape `(batch_size, sequence_length)`)
             The input tensor containing the token sequences.
 
-        hidden_states (`tuple` of size 2)
+        hidden_states1 (`tuple` of size 2)
             The (initial) hidden state. This is a tuple containing
             - h (`torch.FloatTensor` of shape `(num_layers, batch_size, hidden_size)`)
             - c (`torch.FloatTensor` of shape `(num_layers, batch_size, hidden_size)`)
 
+        inputs2 (`torch.LongTensor` of shape `(batch_size, sequence_length)`)
+            The input tensor containing the second token sequences. This is only necessary if
+            self.similarity_task is True.
+
+        hidden_states2 (`tuple` of size 2)
+            The (initial) hidden state for the second sequence. This is a tuple containing
+            - h (`torch.FloatTensor` of shape `(num_layers, batch_size, hidden_size)`)
+            - c (`torch.FloatTensor` of shape `(num_layers, batch_size, hidden_size)`)
+            This is only necessary if self.similarity_task is True.
+
+        feature (`torch.FloatTensor` of shape `(batch_size, 1)`)
+            The feature added to self.similarity_task which is the number of common words between the sequences.
+            This is only necessary if self.similarity_task is True.
+
+
         Returns
         -------
-        log_probas (`torch.FloatTensor` of shape `(batch_size, sequence_length, vocabulary_size)`)
-            A tensor containing the log-probabilities of the next token for
-            all positions in each sequence of the batch. For example, `log_probas[0, 3, 6]`
-            corresponds to log p(x_{5} = token_{7} | x_{0:4}) (x_{5} for the word
-            after x_{4} at index 3, and token_{7} for index 6) for the 1st sequence
-            of the batch (index 0).
+        log_probas (`torch.FloatTensor` of shape `(batch_size, num_class)`)
+            A tensor containing the log-probabilities for each class
 
         hidden_states (`tuple` of size 2)
             The final hidden state. This is a tuple containing
@@ -97,13 +104,14 @@ class LSTM(nn.Module):
         """
         embedded_input = self.embedding(inputs1)
         lstm_output, (h, c) = self.lstm_a(embedded_input, hidden_states1)
-        lstm_output = torch.cat((h[-2, :, :], h[-1, :, :]), 1)
+        lstm_output = torch.sum(lstm_output, dim=1)
 
         if self.similarity_task:
             embedded_input2 = self.embedding(inputs2)
             lstm_output2, (h2, c2) = self.lstm_a(embedded_input2, hidden_states2)
-            sent_sub1, sent_sub2 = h[-2, :, :] - h2[-2, :, :], h[-1, :, :] - h2[-1, :, :]
-            lstm_output = torch.cat((h[-2, :, :], h[-1, :, :], h2[-2, :, :], h2[-1, :, :], sent_sub1, sent_sub2), 1)
+            sent2 = torch.sum(lstm_output2, dim=1)
+            lstm_output = torch.cat((lstm_output, sent2, lstm_output*sent2,
+                                     self.cos_sim(lstm_output, sent2).unsqueeze(-1), feature), 1)
 
         classifier_output = self.classifier(lstm_output)
         log_proba = self.softmax(classifier_output)
@@ -123,4 +131,4 @@ class LSTM(nn.Module):
             c_0_2 = torch.zeros(shape, dtype=torch.float, device=device)
             return (h_0, c_0), (h_0_2, c_0_2)
 
-        return (h_0, c_0)
+        return h_0, c_0
